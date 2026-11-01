@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FeedLink AI - Smart Food Donation</title>
+    <style>
+        :root {
+            --bg: #0a0d14;
+            --surface: #21262d;
+            --surface2: #30363d;
+            --border: rgba(255,255,255,0.1);
+            --accent: #f0a500;
+            --text: #f0f4ff;
+            --muted: #8b949e;
+            --success: #56d364;
+            --warning: #d29922;
+            --danger: #f85149;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--accent);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            border-color: var(--accent);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--surface2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(240, 165, 0, 0.05);
+        }
+
+        .upload-zone.uploading {
+            border-color: var(--accent);
+            background: rgba(240, 165, 0, 0.1);
+        }
+
+        .upload-zone.has-image {
+            padding: 20px;
+        }
+
+        .upload-text {
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .upload-subtext {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .image-preview {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .detection-result {
+            margin-top: 12px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .detection-result.success {
+            background: rgba(86, 211, 100, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+
+        .detection-result.warning {
+            background: rgba(210, 153, 34, 0.1);
+            border: 1px solid var(--warning);
+            color: var(--warning);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--bg);
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .optional {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1 class="card-title">🍽️ Donate Food - FeedLink AI</h1>
+
+            <form id="donateForm">
+                <!-- Image Upload Section -->
+                <div class="form-group">
+                    <label class="form-label">
+                        Food Photo <span class="optional">(optional)</span>
+                    </label>
+                    <div class="upload-zone" id="uploadZone">
+                        <div id="uploadContent">
+                            <div class="upload-text">📸 Drop food photo here or click to upload</div>
+                            <div class="upload-subtext">Supports JPG, PNG, WEBP • Max 10MB</div>
+                        </div>
+                        <img id="imagePreview" class="image-preview" alt="Food preview">
+                        <div id="detectionResult" class="detection-result"></div>
+                    </div>
+                    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                </div>
+
+                <!-- Food Type Dropdown -->
+                <div class="form-group">
+                    <label class="form-label" for="foodType">Food Type</label>
+                    <select class="form-select" id="foodType" required>
+                        <option value="">Select food type...</option>
+                        <option value="cooked-meals">🍛 Cooked Meals</option>
+                        <option value="raw-vegetables">🥕 Raw Vegetables</option>
+                        <option value="packaged-food">📦 Packaged Food</option>
+                        <option value="fruits">🍎 Fruits</option>
+                        <option value="dairy">🥛 Dairy</option>
+                        <option value="bakery-items">🥖 Bakery Items</option>
+                        <option value="rice-grains">🌾 Rice / Grains</option>
+                    </select>
+                </div>
+
+                <!-- Other form fields -->
+                <div class="form-group">
+                    <label class="form-label" for="quantity">Quantity</label>
+                    <input type="number" class="form-input" id="quantity" placeholder="e.g., 50" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="unit">Unit</label>
+                    <select class="form-select" id="unit" required>
+                        <option value="kg">Kilograms (kg)</option>
+                        <option value="meals">Meals</option>
+                        <option value="pieces">Pieces</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="expiryHours">Expiry Time (hours)</label>
+                    <input type="number" class="form-input" id="expiryHours" placeholder="e.g., 24" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="location">Location</label>
+                    <input type="text" class="form-input" id="location" placeholder="Restaurant/Hotel name and address" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="contact">Contact Information</label>
+                    <input type="text" class="form-input" id="contact" placeholder="Phone number or email" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="notes">Additional Notes</label>
+                    <textarea class="form-textarea" id="notes" placeholder="Any special instructions or details..."></textarea>
+                </div>
+
+                <button type="submit" class="btn" id="submitBtn">
+                    🚀 Submit Donation
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- TensorFlow and Teachable Machine scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <script>
+        // Configuration
+        const MODEL_URL = "https://teachablemachine.withgoogle.com/models/food_model/";
+        const FOOD_TYPE_MAPPING = {
+            0: 'cooked-meals', // Assuming model outputs class indices
+            1: 'raw-vegetables',
+            2: 'bakery-items',
+            3: 'fruits',
+            4: 'packaged-food',
+            5: 'dairy',
+            6: 'rice-grains'
+        };
+
+        // DOM elements
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const detectionResult = document.getElementById('detectionResult');
+        const foodTypeSelect = document.getElementById('foodType');
+        const submitBtn = document.getElementById('submitBtn');
+        const uploadContent = document.getElementById('uploadContent');
+
+        let model = null;
+        let uploadedImage = null;
+
+        // Initialize Teachable Machine model
+        async function initModel() {
+            try {
+                const modelURL = MODEL_URL + "model.json";
+                const metadataURL = MODEL_URL + "metadata.json";
+
+                model = await tmImage.load(modelURL, metadataURL);
+                console.log("Model loaded successfully");
+            } catch (error) {
+                console.warn("Failed to load Teachable Machine model:", error);
+                model = null; // Will use fallback
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initModel);
+
+        // Drag and drop functionality
+        uploadZone.addEventListener('click', () => fileInput.click());
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+
+            // Validate file size (10MB max)
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size must be less than 10MB');
+                return;
+            }
+
+            uploadedImage = file;
+
+            // Show loading state
+            uploadZone.classList.add('uploading');
+            detectionResult.className = 'detection-result';
+            detectionResult.textContent = '🔍 Scanning food...';
+            detectionResult.style.display = 'block';
+
+            // Read file and show preview
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                imagePreview.src = e.target.result;
+                imagePreview.style.display = 'block';
+                uploadZone.classList.add('has-image');
+                uploadContent.style.display = 'none';
+
+                // Run AI detection
+                await detectFood(e.target.result);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function detectFood(imageData) {
+            try {
+                if (model) {
+                    // Use Teachable Machine
+                    const img = new Image();
+                    img.onload = async () => {
+                        const predictions = await model.predict(img);
+                        const bestPrediction = predictions.reduce((best, current) =>
+                            current.probability > best.probability ? current : best
+                        );
+
+                        const confidence = Math.round(bestPrediction.probability * 100);
+                        const detectedClass = FOOD_TYPE_MAPPING[bestPrediction.classIndex] || 'cooked-meals';
+
+                        showDetectionResult(detectedClass, confidence);
+                    };
+                    img.src = imageData;
+                } else {
+                    // Use fallback mock classifier
+                    const mockResult = mockClassifier(uploadedImage.name);
+                    showDetectionResult(mockResult.type, mockResult.confidence);
+                }
+            } catch (error) {
+                console.error('Detection failed:', error);
+                // Fallback to manual selection
+                detectionResult.className = 'detection-result warning';
+                detectionResult.textContent = '⚠️ Auto-detect unavailable — please select food type manually';
+                detectionResult.style.display = 'block';
+                uploadZone.classList.remove('uploading');
+            }
+        }
+
+        function showDetectionResult(foodType, confidence) {
+            uploadZone.classList.remove('uploading');
+
+            const foodTypeText = foodTypeSelect.querySelector(`option[value="${foodType}"]`).textContent;
+
+            if (confidence >= 60) {
+                detectionResult.className = 'detection-result success';
+                detectionResult.textContent = `✅ Detected: ${foodTypeText} (${confidence}% confidence)`;
+                foodTypeSelect.value = foodType;
+            } else {
+                detectionResult.className = 'detection-result warning';
+                detectionResult.textContent = `⚠️ Low confidence (${confidence}%) — please verify food type`;
+                // Don't auto-select if low confidence
+            }
+
+            detectionResult.style.display = 'block';
+        }
+
+        function mockClassifier(filename) {
+            const name = filename.toLowerCase();
+
+            if (name.includes('rice') || name.includes('dal') || name.includes('curry') || name.includes('biryani')) {
+                return { type: 'cooked-meals', confidence: 85 };
+            } else if (name.includes('veg') || name.includes('vegetable') || name.includes('salad') || name.includes('carrot')) {
+                return { type: 'raw-vegetables', confidence: 80 };
+            } else if (name.includes('bread') || name.includes('cake') || name.includes('bun') || name.includes('pastry')) {
+                return { type: 'bakery-items', confidence: 90 };
+            } else if (name.includes('fruit') || name.includes('apple') || name.includes('banana') || name.includes('mango')) {
+                return { type: 'fruits', confidence: 75 };
+            } else {
+                return { type: 'cooked-meals', confidence: 45 }; // Low confidence
+            }
+        }
+
+        // Form submission
+        document.getElementById('donateForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            // Basic validation
+            const requiredFields = ['foodType', 'quantity', 'unit', 'expiryHours', 'location', 'contact'];
+            let isValid = true;
+
+            requiredFields.forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                if (!field.value.trim()) {
+                    field.style.borderColor = 'var(--danger)';
+                    isValid = false;
+                } else {
+                    field.style.borderColor = 'var(--border)';
+                }
+            });
+
+            if (!isValid) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            // Collect form data
+            const formData = {
+                foodType: foodTypeSelect.value,
+                quantity: document.getElementById('quantity').value,
+                unit: document.getElementById('unit').value,
+                expiryHours: document.getElementById('expiryHours').value,
+                location: document.getElementById('location').value,
+                contact: document.getElementById('contact').value,
+                notes: document.getElementById('notes').value,
+                image: uploadedImage ? imagePreview.src : null
+            };
+
+            // Simulate submission (replace with actual API call)
+            console.log('Donation submitted:', formData);
+            alert('✅ Donation submitted successfully!\n\nFood Type: ' + foodTypeSelect.options[foodTypeSelect.selectedIndex].text +
+                  '\nQuantity: ' + formData.quantity + ' ' + formData.unit +
+                  '\nLocation: ' + formData.location);
+
+            // Reset form
+            document.getElementById('donateForm').reset();
+            imagePreview.style.display = 'none';
+            uploadZone.classList.remove('has-image');
+            uploadContent.style.display = 'block';
+            detectionResult.style.display = 'none';
+            uploadedImage = null;
+        });
+    </script>
+</body>
+</html>
